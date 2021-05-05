@@ -23,9 +23,9 @@ def start(update: Update, _: CallbackContext):
             InlineKeyboardButton("Категорії витрат", callback_data='1'),
         ],
         [InlineKeyboardButton("Витрати за день", callback_data='2'),
-         InlineKeyboardButton("Витрати за тиждень", callback_data='week')],
-        [InlineKeyboardButton("Витрати за місяць", callback_data='month'),
-         InlineKeyboardButton("Витрати за рік", callback_data='year')],
+         InlineKeyboardButton("Витрати за тиждень", callback_data='3')],
+        [InlineKeyboardButton("Витрати за місяць", callback_data='4'),
+         InlineKeyboardButton("Витрати за рік", callback_data='5')],
 
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -70,7 +70,16 @@ def send_statistics(update, context):
     query = update.callback_query
     query.answer()
     period = statistics.get(update.callback_query.data)
-    query.edit_message_text(f'Витрати за {period}: ...')
+
+    keyboard = keyboard = [
+        [
+            InlineKeyboardButton("На головну", callback_data='1'),
+            InlineKeyboardButton("Завершити", callback_data='2')
+        ],
+
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text(f'Витрати за {period}: <>', reply_markup=reply_markup)
     return 1
 
 
@@ -90,20 +99,31 @@ def choose_category(update, context):
 def save_expense(update, context):
     key = context.user_data.get('category')
     current_category = context.user_data.get('categories').get(key)
+    keyboard = [
+        [
+            InlineKeyboardButton("На головну", callback_data='1'),
+            InlineKeyboardButton("Завершити", callback_data='2')
+        ],
+
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    # print(update.message.text.isnumeric())
+    # print(update.message.text.isdecimal())
     try:
         expense = float(update.message.text)
     except ValueError:
         answer = 'Будь ласка, введіть число'
     else:
         answer = f"Витрати {expense} грн збережено в категорії '{current_category}'."
-    update.message.reply_text(answer)
+    update.message.reply_text(answer, reply_markup=reply_markup)
     return 4
 
 
 def stop(update: Update, _: CallbackContext) -> int:
     """Returns `ConversationHandler.END`, which tells the
     ConversationHandler that the conversation is over"""
-    update.message.reply_text('Гарного дня.')
+    chat_id = update.effective_chat.id
+    bot.send_message(chat_id, text='Щасливо!')
     return ConversationHandler.END
 
 
@@ -117,14 +137,18 @@ def main():
             1: [
                 CallbackQueryHandler(categories_list, pattern='^' + '1' + '$'),
                 CallbackQueryHandler(send_statistics, pattern='^' + '2|3|4|5' + '$'),
+
             ],
             2: [MessageHandler(Filters.text, save_expense, pass_user_data=True)
                 ],
             3: [
                 CallbackQueryHandler(choose_category, pattern='^' + '\d' + '$')
             ],
-            4: [CallbackQueryHandler(start_over)
+            4: [CallbackQueryHandler(start_over, pattern='^' + '1' + '$'),
+                CallbackQueryHandler(stop, pattern='^' + '2' + '$'),
+
                 ],
+
         },
         fallbacks=[CommandHandler('start', start)]
         ,
