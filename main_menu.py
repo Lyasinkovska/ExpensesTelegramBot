@@ -80,7 +80,7 @@ def send_statistics(update, context):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.edit_message_text(f'Витрати за {period}: <>', reply_markup=reply_markup)
-    return 1
+    return 4
 
 
 def choose_category(update, context):
@@ -148,6 +148,7 @@ def main():
                 CallbackQueryHandler(stop, pattern='^' + '2' + '$'),
 
                 ],
+            5: [CallbackQueryHandler(fun, pattern='^' + '1' + '$')]
 
         },
         fallbacks=[CommandHandler('start', start)]
