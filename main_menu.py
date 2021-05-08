@@ -1,5 +1,7 @@
 import logging
 import os
+import re
+
 import telegram
 from telegram import Update, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler, \
@@ -46,7 +48,7 @@ def send_statistics(update, context):
     period = statistics.get(update.callback_query.data)
     message = f'Витрати за {period}: <>'
     reply_markup = start_stop_markup()
-    query_edit_message(update, message, reply_markup)
+    query_edit_message(update, message, reply_markup=reply_markup)
     return 4
 
 
@@ -62,21 +64,25 @@ def choose_category(update, context):
     return 2
 
 
-def save_expense(update, context):
+def check_user_input_expenses(update, context):
     key = context.user_data.get('category')
     current_category = context.user_data.get('categories').get(key)
     reply_markup = start_stop_markup()
-
-    try:
+    if isfloat(update.message.text) or update.message.text.isnumeric():
         expense = float(update.message.text)
-    except ValueError:
-        answer = 'Будь ласка, введіть число'
-    else:
         answer = f"Витрати {expense} грн збережено в категорії '{current_category}'."
-    update.message.reply_text(answer, reply_markup=reply_markup)
-    return 4
+        update.message.reply_text(answer, reply_markup=reply_markup)
+        return 4
+    else:
+        answer = 'Будь ласка, введіть число'
+        update.message.reply_text(answer)
+        return 2
 
 
+def isfloat(element):
+    if re.match(r'^-?\d+(?:\.\d+)$', element) is None:
+        return False
+    return True
 
 
 def stop(update: Update, _: CallbackContext) -> int:
@@ -88,10 +94,10 @@ def stop(update: Update, _: CallbackContext) -> int:
     return ConversationHandler.END
 
 
-def query_edit_message(update, message, reply_markup: InlineKeyboardMarkup = None):
+def query_edit_message(update, message, **kwargs):
     query = update.callback_query
     query.answer()
-    query.edit_message_text(message, reply_markup)
+    query.edit_message_text(message, **kwargs)
 
 
 def main():
@@ -107,7 +113,7 @@ def main():
                 CallbackQueryHandler(send_statistics, pattern='^2|3|4|5$'),
 
             ],
-            2: [MessageHandler(Filters.text, save_expense, pass_user_data=True)
+            2: [MessageHandler(Filters.regex(r'^.*$'), check_user_input_expenses, pass_user_data=True)
                 ],
             3: [
                 CallbackQueryHandler(choose_category, pattern=r'^\d$')
