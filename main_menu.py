@@ -1,12 +1,13 @@
 import logging
-from categories import categories, statistics
+import os
 import telegram
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler, \
     ConversationHandler
-
-import os
 from dotenv import load_dotenv
+
+from keyboard_markups import main_menu_markup, start_stop_markup, categories_markup
+from categories import categories, statistics
 
 load_dotenv('.env')
 TOKEN = os.getenv('TOKEN')
@@ -18,47 +19,22 @@ bot = telegram.Bot(TOKEN)
 
 
 def start(update: Update, _: CallbackContext):
-    keyboard = [
-        [
-            InlineKeyboardButton("Категорії витрат", callback_data='1'),
-        ],
-        [InlineKeyboardButton("Витрати за день", callback_data='2'),
-         InlineKeyboardButton("Витрати за тиждень", callback_data='3')],
-        [InlineKeyboardButton("Витрати за місяць", callback_data='4'),
-         InlineKeyboardButton("Витрати за рік", callback_data='5')],
-
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = main_menu_markup()
     update.message.reply_text('Виберіть варіант:', reply_markup=reply_markup)
     return 1
 
 
 def start_over(update: Update, _: CallbackContext):
-    query = update.callback_query
-    query.answer()
-    keyboard = [
-        [
-            InlineKeyboardButton("Категорії витрат", callback_data='1'),
-        ],
-        [InlineKeyboardButton("Витрати за день", callback_data='2'),
-         InlineKeyboardButton("Витрати за тиждень", callback_data='3')],
-        [InlineKeyboardButton("Витрати за місяць", callback_data='4'),
-         InlineKeyboardButton("Витрати за рік", callback_data='5')],
-
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    query.edit_message_text('Виберіть варіант:', reply_markup=reply_markup)
+    message = 'Виберіть варіант:'
+    reply_markup = main_menu_markup()
+    query_edit_message(update, message, reply_markup=reply_markup)
     return 1
 
 
 def categories_list(update, context: CallbackContext):
-    keyboard = []
-    query = update.callback_query
-    query.answer()
-    for number, category_name in categories.items():
-        keyboard.append([InlineKeyboardButton(category_name, callback_data=number)])
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    query.edit_message_text('Виберіть категорію:', reply_markup=reply_markup)
+    reply_markup = categories_markup()
+    message = 'Виберіть категорію:'
+    query_edit_message(update, message, reply_markup=reply_markup)
 
     user_data = context.user_data
     user_data['categories'] = categories
@@ -67,28 +43,18 @@ def categories_list(update, context: CallbackContext):
 
 
 def send_statistics(update, context):
-    query = update.callback_query
-    query.answer()
     period = statistics.get(update.callback_query.data)
-
-    keyboard = keyboard = [
-        [
-            InlineKeyboardButton("На головну", callback_data='1'),
-            InlineKeyboardButton("Завершити", callback_data='2')
-        ],
-
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    query.edit_message_text(f'Витрати за {period}: <>', reply_markup=reply_markup)
+    message = f'Витрати за {period}: <>'
+    reply_markup = start_stop_markup()
+    query_edit_message(update, message, reply_markup)
     return 4
 
 
 def choose_category(update, context):
-    query = update.callback_query
-    query.answer()
     key = update.callback_query.data
     current_category = context.user_data.get('categories').get(key)
-    query.edit_message_text(f"Введіть суму витрат для категорії '{current_category}' ")
+    message = f"Введіть суму витрат для категорії '{current_category}' "
+    query_edit_message(update, message)
 
     user_data = context.user_data
     user_data['category'] = key
@@ -99,16 +65,8 @@ def choose_category(update, context):
 def save_expense(update, context):
     key = context.user_data.get('category')
     current_category = context.user_data.get('categories').get(key)
-    keyboard = [
-        [
-            InlineKeyboardButton("На головну", callback_data='1'),
-            InlineKeyboardButton("Завершити", callback_data='2')
-        ],
+    reply_markup = start_stop_markup()
 
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    # print(update.message.text.isnumeric())
-    # print(update.message.text.isdecimal())
     try:
         expense = float(update.message.text)
     except ValueError:
@@ -119,44 +77,53 @@ def save_expense(update, context):
     return 4
 
 
+
+
 def stop(update: Update, _: CallbackContext) -> int:
     """Returns `ConversationHandler.END`, which tells the
     ConversationHandler that the conversation is over"""
+
     chat_id = update.effective_chat.id
     bot.send_message(chat_id, text='Щасливо!')
     return ConversationHandler.END
 
 
+def query_edit_message(update, message, reply_markup: InlineKeyboardMarkup = None):
+    query = update.callback_query
+    query.answer()
+    query.edit_message_text(message, reply_markup)
+
+
 def main():
     """Start the bot."""
     updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
+    dispatcher = updater.dispatcher
+
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
             1: [
-                CallbackQueryHandler(categories_list, pattern='^' + '1' + '$'),
-                CallbackQueryHandler(send_statistics, pattern='^' + '2|3|4|5' + '$'),
+                CallbackQueryHandler(categories_list, pattern='^1$'),
+                CallbackQueryHandler(send_statistics, pattern='^2|3|4|5$'),
 
             ],
             2: [MessageHandler(Filters.text, save_expense, pass_user_data=True)
                 ],
             3: [
-                CallbackQueryHandler(choose_category, pattern='^' + '\d' + '$')
+                CallbackQueryHandler(choose_category, pattern=r'^\d$')
             ],
-            4: [CallbackQueryHandler(start_over, pattern='^' + '1' + '$'),
-                CallbackQueryHandler(stop, pattern='^' + '2' + '$'),
+            4: [CallbackQueryHandler(start_over, pattern='^1$'),
+                CallbackQueryHandler(stop, pattern='^2$'),
 
-                ],
-            5: [CallbackQueryHandler(fun, pattern='^' + '1' + '$')]
+                ]
 
         },
         fallbacks=[CommandHandler('start', start)]
         ,
     )
-    dp.add_handler(conv_handler)
-    dp.add_handler(CommandHandler('start', start))
-    dp.add_handler(CommandHandler('stop', stop))
+    dispatcher.add_handler(conv_handler)
+    dispatcher.add_handler(CommandHandler('start', start))
+    dispatcher.add_handler(CommandHandler('stop', stop))
     updater.start_polling()
     updater.idle()
 
