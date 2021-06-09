@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from categories import categories
+from categories import Categories
 
 
 def main_menu_markup():
@@ -30,8 +30,7 @@ def start_stop_markup():
 
 def categories_markup():
     keyboard = []
-    for number, category_name in categories.items():
-        keyboard.append([InlineKeyboardButton(category_name, callback_data=number)])
+    categories = Categories().all_categories
+    for id_number, category_name in categories.items():
+        keyboard.append([InlineKeyboardButton(category_name['name_ua'], callback_data=str(id_number))])
     return InlineKeyboardMarkup(keyboard)
-
-
