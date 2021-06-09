@@ -9,7 +9,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from dotenv import load_dotenv
 
 from keyboard_markups import main_menu_markup, start_stop_markup, categories_markup
-from categories import categories, statistics
+from categories import Categories, statistics
 
 load_dotenv('.env')
 TOKEN = os.getenv('TOKEN')
@@ -36,10 +36,10 @@ def start_over(update: Update, _: CallbackContext):
 def categories_list(update, context: CallbackContext):
     reply_markup = categories_markup()
     message = 'Виберіть категорію:'
-    query_edit_message(update, message, reply_markup=reply_markup)
+    query_edit_message(update, message=message, reply_markup=reply_markup)
 
     user_data = context.user_data
-    user_data['categories'] = categories
+    user_data['categories'] = Categories().all_categories
     context.user_data['categories'] = user_data['categories']
     return 3
 
